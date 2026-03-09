@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
-load("//verilator:defs.bzl", "verilator_cc_library")
+load("//verilator:defs.bzl", "verilator_cc_library", "verilator_hierarchical_block_cc_library", "verilator_hierarchical_plan", "verilator_hierarchical_top_cc_library")
 load("//verilog:defs.bzl", "verilog_library")
 
 package(
@@ -118,6 +118,73 @@ cc_test(
     srcs = ["adder_trace_test.cc"],
     deps = [
         ":adder_trace_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+verilog_library(
+    name = "hier_block_a_sv",
+    srcs = ["hier_block_a.sv"],
+)
+
+verilog_library(
+    name = "hier_block_b_sv",
+    srcs = ["hier_block_b.sv"],
+)
+
+verilog_library(
+    name = "hier_top_local_sv",
+    srcs = ["hier_top.sv"],
+)
+
+verilog_library(
+    name = "hier_full_design_sv",
+    deps = [
+        ":hier_block_a_sv",
+        ":hier_block_b_sv",
+        ":hier_top_local_sv",
+    ],
+)
+
+verilator_hierarchical_plan(
+    name = "hierarchical_plan",
+    blocks = [
+        "hier_block_a",
+        "hier_block_b",
+    ],
+    module = ":hier_full_design_sv",
+    module_top = "hier_top",
+)
+
+verilator_hierarchical_block_cc_library(
+    name = "hier_block_a_verilator",
+    block = "hier_block_a",
+    module = ":hier_block_a_sv",
+    plan = ":hierarchical_plan",
+)
+
+verilator_hierarchical_block_cc_library(
+    name = "hier_block_b_verilator",
+    block = "hier_block_b",
+    module = ":hier_block_b_sv",
+    plan = ":hierarchical_plan",
+)
+
+verilator_hierarchical_top_cc_library(
+    name = "hier_top_verilator",
+    block_deps = [
+        ":hier_block_a_verilator",
+        ":hier_block_b_verilator",
+    ],
+    module = ":hier_top_local_sv",
+    plan = ":hierarchical_plan",
+)
+
+cc_test(
+    name = "hierarchical_compile_test",
+    srcs = ["hierarchical_compile_test.cc"],
+    deps = [
+        ":hier_top_verilator",
         "@googletest//:gtest_main",
     ],
 )

@@ -37,6 +37,9 @@ jobs:
       - name: Run trace tests
         run: bazel test //verilator/tests:adder_trace_test --test_output=errors
 
+      - name: Run hierarchical tests
+        run: bazel test //verilator/tests:hierarchical_compile_test --test_output=errors
+
       - name: Build with SystemC support
         run: bazel build --config=systemc //verilator/tests:adder_systemc_verilator
 

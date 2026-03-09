@@ -7,6 +7,12 @@ cc_binary(
 )
 
 cc_binary(
+    name = "verilator_copy_file",
+    srcs = ["verilator_copy_file.cc"],
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
     name = "verilator_process_wrapper",
     srcs = ["verilator_process_wrapper.cc"],
     visibility = ["//visibility:public"],
