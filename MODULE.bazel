@@ -1,8 +1,7 @@
 module(
     name = "rules_verilator",
-    version = "0.1.0",
+    version = "0.2.0",
     bazel_compatibility = [">=7.5.0"],
-    repo_name = "rules_hdl",
 )
 
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
