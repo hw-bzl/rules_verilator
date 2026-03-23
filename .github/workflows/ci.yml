@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    paths-ignore:
-      - "**.md"
-      - "LICENSE"
+    branches:
+      - main
   pull_request:
 
 jobs:
@@ -14,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        bazel-version: ["7.5.0", "latest"]
+        bazel-version: ["7.*", "8.*", "9.*"]
 
     steps:
       - name: Checkout code
@@ -32,7 +31,7 @@ jobs:
         run: bazel build //...
 
       - name: Run all tests
-        run: bazel test //verilator/tests:adder_test //verilator/tests:load_and_count_test //verilator/tests:nested_module_test --test_output=errors
+        run: bazel test //verilator/tests:adder_test //verilator/tests:include_top_test //verilator/tests:load_and_count_test //verilator/tests:nested_module_test --test_output=errors
 
       - name: Run trace tests
         run: bazel test //verilator/tests:adder_trace_test --test_output=errors

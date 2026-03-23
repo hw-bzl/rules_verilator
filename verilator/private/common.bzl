@@ -105,8 +105,19 @@ def _only_hpp(f):
         return f.path
     return None
 
+def _dedupe_preserve_order(items):
+    """Return unique non-empty strings while preserving first-seen order."""
+    seen = {}
+    deduped = []
+    for item in items:
+        if not item or item in seen:
+            continue
+        seen[item] = True
+        deduped.append(item)
+    return deduped
+
 def collect_verilog_inputs(module):
-    """Flatten the Verilog DAG into source, include, and runfile lists.
+    """Flatten transitive Verilog inputs from `VerilogInfo`.
 
     Args:
         module: A target providing `VerilogInfo`.
@@ -114,11 +125,16 @@ def collect_verilog_inputs(module):
     Returns:
         A struct with `includes`, `runfiles`, and flattened `verilog_files`.
     """
-    dag_entries = module[VerilogInfo].dag.to_list()
-    all_srcs = [entry.srcs for entry in dag_entries]
-    all_data = [entry.data for entry in dag_entries]
-    all_includes = [include for entry in dag_entries for include in entry.includes]
-    all_files = [src for sub_tuple in (all_srcs + all_data) for src in sub_tuple]
+    info = module[VerilogInfo]
+    ordered_infos = info.deps.to_list() + [info]
+
+    all_includes = []
+    all_files = []
+    for dep_info in ordered_infos:
+        all_includes.extend(dep_info.includes.to_list())
+        all_files.extend(dep_info.srcs.to_list())
+        all_files.extend(dep_info.hdrs.to_list())
+        all_files.extend(dep_info.data.to_list())
 
     runfiles = []
     verilog_files = []
@@ -129,7 +145,7 @@ def collect_verilog_inputs(module):
             verilog_files.append(file)
 
     return struct(
-        includes = all_includes,
+        includes = _dedupe_preserve_order(all_includes),
         runfiles = runfiles,
         verilog_files = verilog_files,
     )

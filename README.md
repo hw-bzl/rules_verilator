@@ -20,8 +20,8 @@ Bazel rules for Verilator-based SystemVerilog simulation using the Bazel Central
 Add the following to your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "rules_verilog", version = "0.1.0")
-bazel_dep(name = "rules_verilator", version = "0.2.1")
+bazel_dep(name = "rules_verilog", version = "1.0.0")
+bazel_dep(name = "rules_verilator", version = "0.3.0")
 bazel_dep(name = "verilator", version = "5.044")
 register_toolchains(
     "@rules_verilator//verilator:verilator_toolchain",
@@ -35,8 +35,8 @@ The default toolchain supports C++ output only and does not require SystemC.
 If you need SystemC output, add the SystemC dependency and register the SystemC-enabled toolchain:
 
 ```starlark
-bazel_dep(name = "rules_verilog", version = "0.1.0")
-bazel_dep(name = "rules_verilator", version = "0.2.1")
+bazel_dep(name = "rules_verilog", version = "1.0.0")
+bazel_dep(name = "rules_verilator", version = "0.3.0")
 bazel_dep(name = "verilator", version = "5.044")
 bazel_dep(name = "systemc", version = "3.0.2")
 
@@ -48,6 +48,8 @@ register_toolchains(
 
 > [!TIP]
 > Verilator and SystemC are not bundled with `rules_verilator`. Users must explicitly declare them in their own `MODULE.bazel`. SystemC is **optional** and only required if you set `systemc = True` in your `verilator_cc_library` targets.
+>
+> `rules_verilator` `0.3.0+` requires the refactored `rules_verilog` provider interface (`rules_verilog >= 1.0.0`).
 
 ## Usage
 

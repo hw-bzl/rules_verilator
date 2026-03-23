@@ -26,6 +26,33 @@ verilog_library(
     srcs = ["adder.sv"],
 )
 
+verilog_library(
+    name = "include_leaf_sv",
+    srcs = ["include_leaf.sv"],
+    hdrs = ["include_defs/include_leaf_defs.svh"],
+)
+
+verilog_library(
+    name = "include_top_sv",
+    srcs = ["include_top.sv"],
+    deps = [":include_leaf_sv"],
+)
+
+verilator_cc_library(
+    name = "include_top_verilator",
+    module = ":include_top_sv",
+    module_top = "include_top",
+)
+
+cc_test(
+    name = "include_top_test",
+    srcs = ["include_top_test.cc"],
+    deps = [
+        ":include_top_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
 verilator_cc_library(
     name = "adder_verilator",
     module = ":adder",
