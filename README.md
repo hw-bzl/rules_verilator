@@ -102,7 +102,7 @@ cc_binary(
 
 ### Hierarchical Verilation
 
-For incremental hierarchical builds, use the dedicated hierarchical rules. The regular `verilator_cc_library` remains unchanged.
+For [verilator's hierarchical verilation](https://verilator.org/guide/latest/verilating.html#hierarchical-verilation), use the dedicated hierarchical rules. The regular `verilator_cc_library` remains unchanged.
 
 These rules let large designs be verilated block-by-block instead of recompiling the full design on every change, which improves cache reuse, reduces incremental build time, and keeps top-level integration separate from block implementation details.
 
