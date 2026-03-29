@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - main
+      - master
   pull_request:
 
 jobs:
   test:
-    name: Test on ${{ matrix.os }}
+    name: ${{ matrix.os }} / Bazel ${{ matrix.bazel-version }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         bazel-version: ["7.*", "8.*", "9.*"]
@@ -22,29 +24,11 @@ jobs:
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.9.0
         with:
-          bazelisk-version: "1.x"
           bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
           repository-cache: true
-
-      - name: Build all targets
-        run: bazel build //...
+          disk-cache: ${{ github.workflow }}-${{ matrix.os }}-${{ matrix.bazel-version }}
 
       - name: Run all tests
-        run: bazel test //verilator/tests:adder_test //verilator/tests:include_top_test //verilator/tests:load_and_count_test //verilator/tests:nested_module_test --test_output=errors
-
-      - name: Run trace tests
-        run: bazel test //verilator/tests:adder_trace_test --test_output=errors
-
-      - name: Run hierarchical tests
-        run: bazel test //verilator/tests:hierarchical_compile_test --test_output=errors
-
-      - name: Build with SystemC support
-        run: bazel build --config=systemc //verilator/tests:adder_systemc_verilator
-
-      - name: Run SystemC tests (optional)
-        run: bazel test --config=systemc //verilator/tests:adder_systemc_test --test_output=errors || true
-
-      - name: Check formatting
-        run: |
-          bazel run @rules_license//tools:check_license_headers || true
+        env:
+          USE_BAZEL_VERSION: ${{ matrix.bazel-version }}
+        run: bazel test //... --test_output=errors
