@@ -1,0 +1,13 @@
+load("@rules_verilog//verilog:defs.bzl", "verilog_library")
+
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//verilator/tests:__subpackages__"],
+)
+
+verilog_library(
+    name = "nested_module_2",
+    srcs = ["nested_module_2.sv"],
+    top_module = "nested_module_2",
+    deps = ["//verilator/tests/verilog/nested/module_1:nested_module_1"],
+)

@@ -1,0 +1,36 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("//verilator:defs.bzl", "verilator_cc_library")
+
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//visibility:private"],
+)
+
+verilator_cc_library(
+    name = "nested_module_flat",
+    module = "//verilator/tests/verilog/nested/module_2:nested_module_2",
+)
+
+verilator_cc_library(
+    name = "nested_module_hier",
+    hierarchical = True,
+    module = "//verilator/tests/verilog/nested/module_2:nested_module_2",
+)
+
+cc_test(
+    name = "nested_module_flat_test",
+    srcs = ["nested_module_test.cc"],
+    deps = [
+        ":nested_module_flat",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "nested_module_hier_test",
+    srcs = ["nested_module_test.cc"],
+    deps = [
+        ":nested_module_hier",
+        "@googletest//:gtest_main",
+    ],
+)

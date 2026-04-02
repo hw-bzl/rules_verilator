@@ -1,0 +1,20 @@
+load("@rules_verilog//verilog:defs.bzl", "verilog_library")
+
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//verilator/tests:__subpackages__"],
+)
+
+verilog_library(
+    name = "include_leaf",
+    srcs = ["include_leaf.sv"],
+    hdrs = ["include_defs/include_leaf_defs.svh"],
+    top_module = "include_leaf",
+)
+
+verilog_library(
+    name = "include_top",
+    srcs = ["include_top.sv"],
+    top_module = "include_top",
+    deps = [":include_leaf"],
+)

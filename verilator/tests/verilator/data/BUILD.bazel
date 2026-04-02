@@ -1,0 +1,22 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("//verilator:defs.bzl", "verilator_cc_library")
+
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//visibility:private"],
+)
+
+verilator_cc_library(
+    name = "load_and_count_verilator",
+    module = "//verilator/tests/verilog/data:load_and_count",
+)
+
+cc_test(
+    name = "load_and_count_test",
+    srcs = ["load_and_count_test.cc"],
+    data = ["//verilator/tests/verilog/data:test_data.dat"],
+    deps = [
+        ":load_and_count_verilator",
+        "@googletest//:gtest_main",
+    ],
+)

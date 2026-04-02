@@ -1,0 +1,67 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("//verilator:defs.bzl", "verilator_cc_library")
+
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//visibility:private"],
+)
+
+verilator_cc_library(
+    name = "include_top_verilator",
+    hierarchical = True,
+    module = "//verilator/tests/verilog/include:include_top",
+)
+
+verilator_cc_library(
+    name = "module_0_verilator",
+    hierarchical = True,
+    module = "//verilator/tests/verilog/nested/module_0:nested_module_0",
+)
+
+verilator_cc_library(
+    name = "module_1_verilator",
+    hierarchical = True,
+    module = "//verilator/tests/verilog/nested/module_1:nested_module_1",
+)
+
+verilator_cc_library(
+    name = "module_2_verilator",
+    hierarchical = True,
+    module = "//verilator/tests/verilog/nested/module_2:nested_module_2",
+)
+
+cc_test(
+    name = "include_top_test",
+    srcs = ["include_top_test.cc"],
+    deps = [
+        ":include_top_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "module_0_test",
+    srcs = ["module_0_test.cc"],
+    deps = [
+        ":module_0_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "module_1_test",
+    srcs = ["module_1_test.cc"],
+    deps = [
+        ":module_1_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "module_2_test",
+    srcs = ["module_2_test.cc"],
+    deps = [
+        ":module_2_verilator",
+        "@googletest//:gtest_main",
+    ],
+)

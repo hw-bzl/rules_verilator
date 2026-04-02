@@ -10,7 +10,7 @@ logic [15:0] counter [1];
 assign counter_value = counter[0];
 
 initial begin
-    $readmemh("verilator/tests/test_data.dat", counter);
+    $readmemh("verilator/tests/verilog/data/test_data.dat", counter);
 end
 
 always_ff @(posedge clk) begin

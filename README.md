@@ -9,170 +9,138 @@ Bazel rules for Verilator-based SystemVerilog simulation using the Bazel Central
 
 - Uses BCR Verilator for better reproducibility and version management
 - Supports both C++ and SystemC output
-- Support incremental hierarchical builds
-- Optional waveform tracing support
+- Dual-mode compilation: flat (single invocation) and hierarchical (per-module)
+- Optional waveform tracing support via per-target `trace` attribute
 - Compatible with Bazel 7.5.0+
 
 ## Installation
 
-### Default Installation (C++ Only)
-
-Add the following to your `MODULE.bazel`:
-
 ```starlark
 bazel_dep(name = "rules_verilator", version = "0.3.1")
-bazel_dep(name = "verilator", version = "5.044")
-register_toolchains(
-    "@rules_verilator//verilator:verilator_toolchain",
-)
-```
 
-The default toolchain supports C++ output only and does not require SystemC.
-
-### With SystemC Support
-
-If you need SystemC output, add the SystemC dependency and register the SystemC-enabled toolchain:
-
-```starlark
-bazel_dep(name = "rules_verilator", version = "0.3.1")
+bazel_dep(name = "rules_verilog", version = "1.1.1")
 bazel_dep(name = "verilator", version = "5.044")
 bazel_dep(name = "systemc", version = "3.0.2")
-
-# Register the SystemC-enabled toolchain
-register_toolchains(
-    "@rules_verilator//verilator:verilator_toolchain_with_systemc",
-)
 ```
 
 > [!TIP]
 > Verilator and SystemC are not bundled with `rules_verilator`. Users must explicitly declare them in their own `MODULE.bazel`. SystemC is **optional** and only required if you set `systemc = True` in your `verilator_cc_library` targets.
 >
-> `rules_verilator` `0.3.0+` requires the refactored `rules_verilog` provider interface (`rules_verilog >= 1.0.0`).
+> `rules_verilator` `0.3.0+` requires the refactored `rules_verilog` provider interface (`rules_verilog >= 1.1.1`).
 
 ## Usage
 
 You can check `verilator/tests` for examples as well.
 
-### Verilator C++ Library
+### Flat Compilation (Default)
+
+A single Verilator invocation processes the top module and all transitive sources. Best for simulation performance.
 
 ```starlark
-load("@rules_verilator//verilator:defs.bzl", "verilator_cc_library")
-
-verilator_cc_library(
-    name = "my_verilated_lib",
-    module = ":my_module",
-    module_top = "my_top_module",
-    trace = True,  # Enable waveform tracing
-    vopts = [
-        "-Wall",
-        "--x-assign fast",
-        "--x-initial fast",
-    ],
-)
-
-cc_binary(
-    name = "my_test",
-    srcs = ["testbench.cpp"],
-    deps = [":my_verilated_lib"],
-)
-```
-
-### Verilator SystemC Library
-
-```starlark
-load("@rules_verilator//verilator:defs.bzl", "verilator_cc_library")
-
-verilator_cc_library(
-    name = "my_verilated_sc_lib",
-    module = ":my_module",
-    module_top = "my_top_module",
-    systemc = True,  # Generate SystemC output
-    trace = True,
-    vopts = ["-Wall"],
-)
-
-cc_binary(
-    name = "my_sc_test",
-    srcs = ["testbench_sc.cpp"],
-    deps = [":my_verilated_sc_lib"],
-)
-```
-
-### Hierarchical Verilation
-
-For [verilator's hierarchical verilation](https://verilator.org/guide/latest/verilating.html#hierarchical-verilation), use the dedicated hierarchical rules. The regular `verilator_cc_library` remains unchanged.
-
-These rules let large designs be verilated block-by-block instead of recompiling the full design on every change, which improves cache reuse, reduces incremental build time, and keeps top-level integration separate from block implementation details.
-
-```starlark
-load(
-    "@rules_verilator//verilator:defs.bzl",
-    "verilator_hierarchical_block_cc_library",
-    "verilator_hierarchical_plan",
-    "verilator_hierarchical_top_cc_library",
-)
 load("@rules_verilog//verilog:defs.bzl", "verilog_library")
+load("@rules_verilator//verilator:defs.bzl", "verilator_cc_library")
 
 verilog_library(
-    name = "block_a_sv",
+    name = "adder",
+    srcs = ["adder.sv"],
+    top_module = "adder",
+)
+
+verilator_cc_library(
+    name = "adder_v",
+    module = ":adder",
+)
+
+cc_test(
+    name = "adder_test",
+    srcs = ["adder_test.cc"],
+    deps = [":adder_v"],
+)
+```
+
+The top module name is inferred from `VerilogInfo.top_module`.Override with `module_top`:
+
+```starlark
+verilator_cc_library(
+    name = "nested_v",
+    module = ":nested_modules",
+    module_top = "nested_2",
+)
+```
+
+### Hierarchical Compilation
+
+Each `verilog_library` in the dependency tree is compiled independently via an aspect that propagates through `deps`. Best for incremental build performance on large designs.
+
+```starlark
+load("@rules_verilog//verilog:defs.bzl", "verilog_library")
+load("@rules_verilator//verilator:defs.bzl", "verilator_cc_library")
+
+verilog_library(
+    name = "block_a",
     srcs = ["block_a.sv"],
 )
 
 verilog_library(
-    name = "block_b_sv",
+    name = "block_b",
     srcs = ["block_b.sv"],
 )
 
 verilog_library(
-    name = "top_local_sv",
+    name = "top",
     srcs = ["top.sv"],
+    deps = [":block_a", ":block_b"],
+    top_module = "top",
 )
 
-verilog_library(
-    name = "full_design_sv",
-    deps = [
-        ":block_a_sv",
-        ":block_b_sv",
-        ":top_local_sv",
-    ],
+verilator_cc_library(
+    name = "top_v",
+    module = ":top",
+    hierarchical = True,
 )
 
-verilator_hierarchical_plan(
-    name = "top_plan",
-    module = ":full_design_sv",
-    module_top = "top",
-    blocks = ["block_a", "block_b"],
-)
-
-verilator_hierarchical_block_cc_library(
-    name = "block_a_verilated",
-    plan = ":top_plan",
-    block = "block_a",
-    module = ":block_a_sv",
-)
-
-verilator_hierarchical_block_cc_library(
-    name = "block_b_verilated",
-    plan = ":top_plan",
-    block = "block_b",
-    module = ":block_b_sv",
-)
-
-verilator_hierarchical_top_cc_library(
-    name = "top_verilated",
-    plan = ":top_plan",
-    module = ":top_local_sv",
-    block_deps = [
-        ":block_a_verilated",
-        ":block_b_verilated",
-    ],
+cc_test(
+    name = "top_test",
+    srcs = ["top_test.cc"],
+    deps = [":top_v"],
 )
 ```
 
-Notes:
-- `blocks` is the list of Verilog module names to compile as independent hierarchical blocks.
-- `module` on `verilator_hierarchical_top_cc_library` should contain only top-local sources; keep block sources in their own `verilog_library` targets to preserve cache isolation.
-- The rules auto-generate the temporary `.vlt` hierarchy control file; users do not need to maintain it manually.
+No manual plan/block/top wiring needed -- the Bazel dependency graph is the hierarchy.
+
+### Trace and SystemC
+
+`trace` and `systemc` are per-target attributes propagated via private build settings and configuration transitions:
+
+```starlark
+verilator_cc_library(
+    name = "adder_trace_v",
+    module = ":adder",
+    trace = True,
+)
+
+verilator_cc_library(
+    name = "adder_sc_v",
+    module = ":adder",
+    systemc = True,
+)
+```
+
+## API Reference
+
+### `verilator_cc_library`
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `module` | `label` | mandatory | A `verilog_library` target providing `VerilogInfo`. |
+| `module_top` | `string` | `""` | Override for the top module name. Inferred from `VerilogInfo.top` if empty. |
+| `hierarchical` | `bool` | `False` | Use hierarchical compilation (per-module aspects). |
+| `trace` | `bool` | `False` | Enable Verilator tracing (`--trace`, `-DVM_TRACE`). |
+| `systemc` | `bool` | `False` | Generate SystemC output (`--sc`). Requires SystemC toolchain. |
+| `copts` | `string_list` | `[]` | Additional C++ compilation flags. |
+| `vopts` | `string_list` | `["-Wall"]` | Additional Verilator command line options. |
+| `data` | `label_list` | `[]` | Data files needed at runtime. |
+| `linkopts` | `string_list` | `[]` | Additional linker options. |
 
 ## Key Differences from rules_hdl
 
@@ -183,7 +151,7 @@ Notes:
 - **Optional SystemC**: SystemC is not bundled; users add it only when needed
 - **Bzlmod only**: Designed for MODULE.bazel, not legacy WORKSPACE
 - **Focused scope**: Only Verilator rules, no synthesis/PnR tools
-- **More feature**: Newer version of Verilator, supporting incremental hierarchical builds
+- **Dual-mode compilation**: Single `verilator_cc_library` rule supports both flat and hierarchical modes
 
 ## Requirements
 

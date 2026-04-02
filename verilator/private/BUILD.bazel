@@ -1,19 +1,28 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_setting")
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
-cc_binary(
-    name = "verilator_copy_tree",
-    srcs = ["verilator_copy_tree.cc"],
-    visibility = ["//visibility:public"],
+bool_setting(
+    name = "_trace",
+    build_setting_default = False,
+    visibility = ["//verilator:__subpackages__"],
 )
 
-cc_binary(
-    name = "verilator_copy_file",
-    srcs = ["verilator_copy_file.cc"],
-    visibility = ["//visibility:public"],
+bool_setting(
+    name = "_systemc",
+    build_setting_default = False,
+    visibility = ["//verilator:__subpackages__"],
 )
 
 cc_binary(
     name = "verilator_process_wrapper",
     srcs = ["verilator_process_wrapper.cc"],
+    copts = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["-std=c++17"],
+    }),
+    linkopts = select({
+        "@platforms//os:linux": ["-lstdc++fs"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
 )

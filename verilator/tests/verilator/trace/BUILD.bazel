@@ -1,0 +1,59 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("//verilator:defs.bzl", "verilator_cc_library")
+
+package(
+    default_applicable_licenses = ["//:package_license"],
+    default_visibility = ["//visibility:private"],
+)
+
+verilator_cc_library(
+    name = "adder_trace_verilator",
+    module = "//verilator/tests/verilog/adder",
+    trace = True,
+)
+
+verilator_cc_library(
+    name = "adder_trace_verilator_hier",
+    hierarchical = True,
+    module = "//verilator/tests/verilog/adder",
+    trace = True,
+)
+
+verilator_cc_library(
+    name = "nested_module_trace_verilator",
+    module = "//verilator/tests/verilog/nested/module_2:nested_module_2",
+    trace = True,
+)
+
+verilator_cc_library(
+    name = "nested_module_trace_verilator_hier",
+    module = "//verilator/tests/verilog/nested/module_2:nested_module_2",
+    trace = True,
+)
+
+cc_test(
+    name = "adder_trace_test",
+    srcs = ["adder_trace_test.cc"],
+    deps = [
+        ":adder_trace_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "adder_trace_hier_test",
+    srcs = ["adder_trace_test.cc"],
+    deps = [
+        ":adder_trace_verilator_hier",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "nested_module_trace_hier_test",
+    srcs = ["nested_module_trace_test.cc"],
+    deps = [
+        ":nested_module_trace_verilator_hier",
+        "@googletest//:gtest_main",
+    ],
+)

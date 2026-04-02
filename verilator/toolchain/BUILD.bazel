@@ -1,0 +1,15 @@
+load("//verilator:defs.bzl", "verilator_toolchain")
+
+verilator_toolchain(
+    name = "verilator_toolchain",
+    libverilator = "@verilator//:verilated",
+    systemc = "@systemc//:systemc",
+    verilator = "@verilator",
+)
+
+toolchain(
+    name = "toolchain",
+    toolchain = ":verilator_toolchain",
+    toolchain_type = "//verilator:toolchain_type",
+    visibility = ["//visibility:public"],
+)
