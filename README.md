@@ -11,7 +11,6 @@ Bazel rules for Verilator-based SystemVerilog simulation using the Bazel Central
 - Supports both C++ and SystemC output
 - Support incremental hierarchical builds
 - Optional waveform tracing support
-- Compatible with Bazel 7.5.0+
 
 ## Installation
 
@@ -20,8 +19,7 @@ Bazel rules for Verilator-based SystemVerilog simulation using the Bazel Central
 Add the following to your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "rules_verilator", version = "0.3.1")
-bazel_dep(name = "verilator", version = "5.044")
+bazel_dep(name = "rules_verilator", version = "0.3.2")
 register_toolchains(
     "@rules_verilator//verilator:verilator_toolchain",
 )
@@ -34,8 +32,7 @@ The default toolchain supports C++ output only and does not require SystemC.
 If you need SystemC output, add the SystemC dependency and register the SystemC-enabled toolchain:
 
 ```starlark
-bazel_dep(name = "rules_verilator", version = "0.3.1")
-bazel_dep(name = "verilator", version = "5.044")
+bazel_dep(name = "rules_verilator", version = "0.3.2")
 bazel_dep(name = "systemc", version = "3.0.2")
 
 # Register the SystemC-enabled toolchain
@@ -187,8 +184,8 @@ Notes:
 
 ## Requirements
 
-- Bazel 7.5.0 or later
-- Verilator 5.036+ from BCR
+- Bazel >=7.6.0, >=8.1.0, 9
+- Verilator >= 5.046.bcr.3 from BCR
 - SystemC 3.0.2 from BCR (optional, for SystemC output)
 
 ## License

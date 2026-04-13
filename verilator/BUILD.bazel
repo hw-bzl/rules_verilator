@@ -27,7 +27,7 @@ toolchain_type(
 verilator_toolchain(
     name = "verilator_toolchain_impl",
     verilator = "@verilator//:verilator_executable",
-    deps = ["@verilator"],
+    deps = ["@verilator//:verilated"],
 )
 
 toolchain(
@@ -41,7 +41,7 @@ verilator_toolchain(
     name = "verilator_toolchain_with_systemc_impl",
     systemc = "@systemc//:systemc",
     verilator = "@verilator//:verilator_executable",
-    deps = ["@verilator"],
+    deps = ["@verilator//:verilated"],
 )
 
 toolchain(
