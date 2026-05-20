@@ -215,3 +215,43 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+verilog_library(
+    name = "timing_tb_sv",
+    srcs = ["timing_tb.sv"],
+)
+
+verilator_cc_library(
+    name = "timing_tb_verilator",
+    module = ":timing_tb_sv",
+    module_top = "timing_tb",
+    vopts = [
+        "-Wall",
+        "--timing",
+    ],
+)
+
+cc_test(
+    name = "timing_tb_test",
+    srcs = ["timing_tb_test.cc"],
+    deps = [
+        ":timing_tb_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+verilator_cc_library(
+    name = "timing_tb_main_verilator",
+    module = ":timing_tb_sv",
+    module_top = "timing_tb",
+    vopts = [
+        "-Wall",
+        "--timing",
+        "--main",
+    ],
+)
+
+cc_test(
+    name = "timing_tb_main_test",
+    deps = [":timing_tb_main_verilator"],
+)
