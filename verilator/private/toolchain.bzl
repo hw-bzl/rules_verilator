@@ -23,7 +23,7 @@ verilator_toolchain = rule(
             default = Label("//verilator/settings:avoid_nondeterministic_outputs"),
         ),
         "deps": attr.label_list(
-            doc = "Global Verilator dependencies to link into downstream targets.",
+            doc = "Additional common dependencies to link into downstream targets.",
             providers = [CcInfo],
         ),
         "extra_vopts": attr.string_list(
