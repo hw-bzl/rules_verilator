@@ -9,6 +9,25 @@ _SV_SRC = ["sv", "v"]
 _CPP_SRC = ["cc", "cpp", "cxx", "c++"]
 _HPP_SRC = ["h", "hh", "hpp"]
 _RUNFILES = ["dat", "mem"]
+_MSVC_LIKE_COMPILERS = ("msvc-cl", "clang-cl")
+
+def _verilator_timing_transition_impl(_settings, _attr):
+    return {"@verilator//:timing": True}
+
+def _verilator_no_timing_transition_impl(_settings, _attr):
+    return {"@verilator//:timing": False}
+
+verilator_timing_transition = transition(
+    implementation = _verilator_timing_transition_impl,
+    inputs = [],
+    outputs = ["@verilator//:timing"],
+)
+
+verilator_no_timing_transition = transition(
+    implementation = _verilator_no_timing_transition_impl,
+    inputs = [],
+    outputs = ["@verilator//:timing"],
+)
 
 def cc_compile_and_link_static_library(
         ctx,
@@ -19,7 +38,8 @@ def cc_compile_and_link_static_library(
         link_deps = None,
         runfiles = [],
         includes = [],
-        defines = []):
+        defines = [],
+        extra_copts = []):
     """Compile and link C++ source into a static library.
 
     Args:
@@ -32,6 +52,7 @@ def cc_compile_and_link_static_library(
         runfiles: Data dependencies that are read at runtime.
         includes: The includes for the verilator module to build.
         defines: Cpp defines to build with.
+        extra_copts: Extra C++ compiler options injected by the rule.
 
     Returns:
         Providers containing the compiled library outputs.
@@ -47,13 +68,13 @@ def cc_compile_and_link_static_library(
     compile_deps = deps if compile_deps == None else compile_deps
     link_deps = deps if link_deps == None else link_deps
 
-    compilation_contexts = [dep[CcInfo].compilation_context for dep in compile_deps]
+    compilation_contexts = [_to_cc_info(dep).compilation_context for dep in compile_deps]
     compilation_context, compilation_outputs = cc_common.compile(
         name = ctx.label.name,
         actions = ctx.actions,
         feature_configuration = feature_configuration,
         cc_toolchain = cc_toolchain,
-        user_compile_flags = ctx.attr.copts,
+        user_compile_flags = ctx.attr.copts + extra_copts,
         srcs = srcs,
         includes = includes,
         defines = defines,
@@ -61,7 +82,7 @@ def cc_compile_and_link_static_library(
         compilation_contexts = compilation_contexts,
     )
 
-    linking_contexts = [dep[CcInfo].linking_context for dep in link_deps]
+    linking_contexts = [_to_cc_info(dep).linking_context for dep in link_deps]
     linking_context, linking_output = cc_common.create_linking_context_from_compilation_outputs(
         actions = ctx.actions,
         feature_configuration = feature_configuration,
@@ -115,6 +136,12 @@ def _dedupe_preserve_order(items):
         seen[item] = True
         deduped.append(item)
     return deduped
+
+def _to_cc_info(dep):
+    """Normalize a dependency to its `CcInfo` provider."""
+    if type(dep) == "Target":
+        return dep[CcInfo]
+    return dep
 
 def collect_verilog_inputs(module):
     """Flatten transitive Verilog inputs from `VerilogInfo`.
@@ -199,3 +226,32 @@ def copy_generated_cpp_and_hpp(ctx, generated_dir):
 def hierarchical_prefix(module_name):
     """Return the Verilator-generated output prefix for a module."""
     return "V" + module_name
+
+def timing_enabled(vopts):
+    """Return whether Verilator timing support is enabled by the final option set."""
+    enabled = False
+    for opt in vopts:
+        if opt == "--timing":
+            enabled = True
+        elif opt == "--no-timing":
+            enabled = False
+    return enabled
+
+def timing_deps(ctx, verilator_toolchain, timing, systemc = False):
+    """Return runtime/link dependencies for the requested timing/systemc mode."""
+    runtime = ctx.attr._verilated_timing_runtime if timing else ctx.attr._verilated_runtime
+    deps = list(runtime) if type(runtime) == "list" else [runtime]
+    deps.extend(verilator_toolchain.deps)
+    if systemc:
+        deps.append(verilator_toolchain.systemc)
+    return deps
+
+def timing_copts(ctx, timing):
+    """Return compiler options needed for generated timing-enabled C++."""
+    if not timing:
+        return []
+
+    cc_toolchain = find_cpp_toolchain(ctx)
+    if cc_toolchain.compiler in _MSVC_LIKE_COMPILERS:
+        return ["/std:c++20"]
+    return ["-std=c++20"]

@@ -9,7 +9,12 @@ load(
     "copy_generated_cpp_and_hpp",
     "hierarchical_prefix",
     "only_sv",
+    "timing_copts",
+    "timing_deps",
+    "timing_enabled",
     "verilator_env",
+    "verilator_no_timing_transition",
+    "verilator_timing_transition",
 )
 load(
     ":providers.bzl",
@@ -137,6 +142,7 @@ def _verilator_hierarchical_block_cc_library_impl(ctx):
     verilog_inputs = collect_verilog_inputs(ctx.attr.module)
     generated_dir = ctx.actions.declare_directory(ctx.label.name + "-gen")
     wrapper_sv = ctx.actions.declare_file(ctx.label.name + "/" + ctx.attr.block + ".sv")
+    timing = timing_enabled(verilator_toolchain.extra_vopts + plan.vopts)
 
     args = ctx.actions.args()
     args.add(verilator_toolchain.verilator)
@@ -177,7 +183,8 @@ def _verilator_hierarchical_block_cc_library_impl(ctx):
         defines = defines,
         runfiles = verilog_inputs.runfiles,
         includes = [copied_outputs.hpp.path],
-        deps = verilator_toolchain.deps,
+        deps = timing_deps(ctx, verilator_toolchain, timing = timing),
+        extra_copts = timing_copts(ctx, timing),
     )
 
     return compile_and_link_outputs + [
@@ -193,6 +200,7 @@ def _verilator_hierarchical_top_cc_library_impl(ctx):
     verilog_inputs = collect_verilog_inputs(ctx.attr.module)
     generated_dir = ctx.actions.declare_directory(ctx.label.name + "-gen")
     prefix = hierarchical_prefix(plan.module_top)
+    timing = timing_enabled(verilator_toolchain.extra_vopts + plan.vopts)
 
     ordered_block_infos = _collect_ordered_block_infos(
         ctx.attr.block_deps,
@@ -237,7 +245,7 @@ def _verilator_hierarchical_top_cc_library_impl(ctx):
 
     copied_outputs = copy_generated_cpp_and_hpp(ctx, generated_dir)
     defines = ["VM_TRACE"] if plan.trace else []
-    compile_and_link_deps = verilator_toolchain.deps
+    compile_and_link_deps = timing_deps(ctx, verilator_toolchain, timing = timing)
     return cc_compile_and_link_static_library(
         ctx,
         srcs = [copied_outputs.cpp],
@@ -247,6 +255,7 @@ def _verilator_hierarchical_top_cc_library_impl(ctx):
         includes = [copied_outputs.hpp.path],
         compile_deps = compile_and_link_deps,
         link_deps = compile_and_link_deps + block_link_deps,
+        extra_copts = timing_copts(ctx, timing),
     )
 
 verilator_hierarchical_plan = rule(
@@ -313,6 +322,9 @@ verilator_hierarchical_block_cc_library = rule(
             providers = [VerilatorHierPlanInfo],
             mandatory = True,
         ),
+        "_allowlist_function_transition": attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
+        ),
         "_cc_toolchain": attr.label(
             doc = "CC compiler.",
             default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
@@ -334,6 +346,16 @@ verilator_hierarchical_block_cc_library = rule(
             executable = True,
             cfg = "exec",
             default = Label("//verilator/private:verilator_process_wrapper"),
+        ),
+        "_verilated_runtime": attr.label(
+            cfg = verilator_no_timing_transition,
+            default = Label("@verilator//:verilated"),
+            providers = [CcInfo],
+        ),
+        "_verilated_timing_runtime": attr.label(
+            cfg = verilator_timing_transition,
+            default = Label("@verilator//:verilated"),
+            providers = [CcInfo],
         ),
     },
     provides = [CcInfo, DefaultInfo, VerilatorHierBlockInfo],
@@ -367,6 +389,9 @@ verilator_hierarchical_top_cc_library = rule(
             providers = [VerilatorHierPlanInfo],
             mandatory = True,
         ),
+        "_allowlist_function_transition": attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
+        ),
         "_cc_toolchain": attr.label(
             doc = "CC compiler.",
             default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
@@ -382,6 +407,16 @@ verilator_hierarchical_top_cc_library = rule(
             executable = True,
             cfg = "exec",
             default = Label("//verilator/private:verilator_process_wrapper"),
+        ),
+        "_verilated_runtime": attr.label(
+            cfg = verilator_no_timing_transition,
+            default = Label("@verilator//:verilated"),
+            providers = [CcInfo],
+        ),
+        "_verilated_timing_runtime": attr.label(
+            cfg = verilator_timing_transition,
+            default = Label("@verilator//:verilated"),
+            providers = [CcInfo],
         ),
     },
     provides = [CcInfo, DefaultInfo],
