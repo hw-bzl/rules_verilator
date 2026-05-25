@@ -8,7 +8,12 @@ load(
     "collect_verilog_inputs",
     "copy_generated_cpp_and_hpp",
     "only_sv",
+    "reject_managed_vopts",
+    "timing_copts",
+    "timing_deps",
     "verilator_env",
+    "verilator_no_timing_transition",
+    "verilator_timing_transition",
 )
 
 def _verilator_cc_library_impl(ctx):
@@ -17,6 +22,10 @@ def _verilator_cc_library_impl(ctx):
     verilog_inputs = collect_verilog_inputs(ctx.attr.module)
     verilator_output = ctx.actions.declare_directory(ctx.label.name + "-gen")
     prefix = "V" + ctx.attr.module_top
+    timing = ctx.attr.timing
+
+    reject_managed_vopts(verilator_toolchain.extra_vopts, "verilator_toolchain.extra_vopts")
+    reject_managed_vopts(ctx.attr.vopts, "{}.vopts".format(ctx.label))
 
     args = ctx.actions.args()
     args.add(verilator_toolchain.verilator)
@@ -24,6 +33,8 @@ def _verilator_cc_library_impl(ctx):
     args.add("--Mdir", verilator_output.path)
     args.add("--top-module", ctx.attr.module_top)
     args.add("--prefix", prefix)
+    if timing:
+        args.add("--timing")
     if ctx.attr.trace:
         args.add("--trace")
     if ctx.attr.systemc:
@@ -53,9 +64,12 @@ def _verilator_cc_library_impl(ctx):
 
     copied_outputs = copy_generated_cpp_and_hpp(ctx, verilator_output)
     defines = ["VM_TRACE"] if ctx.attr.trace else []
-    deps = verilator_toolchain.deps
-    if ctx.attr.systemc and verilator_toolchain.systemc:
-        deps = deps + [verilator_toolchain.systemc]
+    deps = timing_deps(
+        ctx,
+        verilator_toolchain,
+        timing = timing,
+        systemc = ctx.attr.systemc and verilator_toolchain.systemc != None,
+    )
 
     return cc_compile_and_link_static_library(
         ctx,
@@ -65,6 +79,7 @@ def _verilator_cc_library_impl(ctx):
         runfiles = verilog_inputs.runfiles,
         includes = [copied_outputs.hpp.path],
         deps = deps,
+        extra_copts = timing_copts(ctx, timing),
     )
 
 verilator_cc_library = rule(
@@ -87,6 +102,10 @@ verilator_cc_library = rule(
             doc = "Generate SystemC code.",
             default = False,
         ),
+        "timing": attr.bool(
+            doc = "Enable Verilator timing support and link the timing runtime.",
+            default = False,
+        ),
         "trace": attr.bool(
             doc = "Enable tracing for Verilator",
             default = False,
@@ -94,6 +113,9 @@ verilator_cc_library = rule(
         "vopts": attr.string_list(
             doc = "Additional command line options to pass to Verilator",
             default = ["-Wall"],
+        ),
+        "_allowlist_function_transition": attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
         "_cc_toolchain": attr.label(
             doc = "CC compiler.",
@@ -110,6 +132,16 @@ verilator_cc_library = rule(
             executable = True,
             cfg = "exec",
             default = Label("//verilator/private:verilator_process_wrapper"),
+        ),
+        "_verilated_runtime": attr.label(
+            cfg = verilator_no_timing_transition,
+            default = Label("@verilator//:verilated"),
+            providers = [CcInfo],
+        ),
+        "_verilated_timing_runtime": attr.label(
+            cfg = verilator_timing_transition,
+            default = Label("@verilator//:verilated"),
+            providers = [CcInfo],
         ),
     },
     provides = [

@@ -9,6 +9,32 @@ _SV_SRC = ["sv", "v"]
 _CPP_SRC = ["cc", "cpp", "cxx", "c++"]
 _HPP_SRC = ["h", "hh", "hpp"]
 _RUNFILES = ["dat", "mem"]
+_MSVC_LIKE_COMPILERS = ("msvc-cl", "clang-cl")
+_MANAGED_VOPT_TO_ATTR = {
+    "--cc": "systemc",
+    "--no-timing": "timing",
+    "--sc": "systemc",
+    "--timing": "timing",
+    "--trace": "trace",
+}
+
+def _verilator_timing_transition_impl(_settings, _attr):
+    return {"@verilator//:timing": True}
+
+def _verilator_no_timing_transition_impl(_settings, _attr):
+    return {"@verilator//:timing": False}
+
+verilator_timing_transition = transition(
+    implementation = _verilator_timing_transition_impl,
+    inputs = [],
+    outputs = ["@verilator//:timing"],
+)
+
+verilator_no_timing_transition = transition(
+    implementation = _verilator_no_timing_transition_impl,
+    inputs = [],
+    outputs = ["@verilator//:timing"],
+)
 
 def cc_compile_and_link_static_library(
         ctx,
@@ -19,7 +45,8 @@ def cc_compile_and_link_static_library(
         link_deps = None,
         runfiles = [],
         includes = [],
-        defines = []):
+        defines = [],
+        extra_copts = []):
     """Compile and link C++ source into a static library.
 
     Args:
@@ -32,6 +59,7 @@ def cc_compile_and_link_static_library(
         runfiles: Data dependencies that are read at runtime.
         includes: The includes for the verilator module to build.
         defines: Cpp defines to build with.
+        extra_copts: Extra C++ compiler options injected by the rule.
 
     Returns:
         Providers containing the compiled library outputs.
@@ -47,13 +75,13 @@ def cc_compile_and_link_static_library(
     compile_deps = deps if compile_deps == None else compile_deps
     link_deps = deps if link_deps == None else link_deps
 
-    compilation_contexts = [dep[CcInfo].compilation_context for dep in compile_deps]
+    compilation_contexts = [_to_cc_info(dep).compilation_context for dep in compile_deps]
     compilation_context, compilation_outputs = cc_common.compile(
         name = ctx.label.name,
         actions = ctx.actions,
         feature_configuration = feature_configuration,
         cc_toolchain = cc_toolchain,
-        user_compile_flags = ctx.attr.copts,
+        user_compile_flags = ctx.attr.copts + extra_copts,
         srcs = srcs,
         includes = includes,
         defines = defines,
@@ -61,7 +89,7 @@ def cc_compile_and_link_static_library(
         compilation_contexts = compilation_contexts,
     )
 
-    linking_contexts = [dep[CcInfo].linking_context for dep in link_deps]
+    linking_contexts = [_to_cc_info(dep).linking_context for dep in link_deps]
     linking_context, linking_output = cc_common.create_linking_context_from_compilation_outputs(
         actions = ctx.actions,
         feature_configuration = feature_configuration,
@@ -115,6 +143,12 @@ def _dedupe_preserve_order(items):
         seen[item] = True
         deduped.append(item)
     return deduped
+
+def _to_cc_info(dep):
+    """Normalize a dependency to its `CcInfo` provider."""
+    if type(dep) == "Target":
+        return dep[CcInfo]
+    return dep
 
 def collect_verilog_inputs(module):
     """Flatten transitive Verilog inputs from `VerilogInfo`.
@@ -199,3 +233,69 @@ def copy_generated_cpp_and_hpp(ctx, generated_dir):
 def hierarchical_prefix(module_name):
     """Return the Verilator-generated output prefix for a module."""
     return "V" + module_name
+
+def reject_managed_vopts(vopts, owner):
+    """Fail if rule-managed Verilator options are passed through a free-form list.
+
+    Args:
+        vopts: Ordered Verilator command-line options to validate.
+        owner: Human-readable description of where the options came from.
+
+    Returns:
+        None. The function fails if managed flags are found.
+    """
+    attr_to_flags = {}
+    for opt in vopts:
+        attr = _MANAGED_VOPT_TO_ATTR.get(opt)
+        if attr == None:
+            continue
+        if attr not in attr_to_flags:
+            attr_to_flags[attr] = []
+        if opt not in attr_to_flags[attr]:
+            attr_to_flags[attr].append(opt)
+
+    if attr_to_flags:
+        groups = []
+        for attr in sorted(attr_to_flags.keys()):
+            groups.append("`{}` for `{}`".format(", ".join(attr_to_flags[attr]), attr))
+        fail("{} must not contain {}. Use the explicit rule attributes instead.".format(
+            owner,
+            ", ".join(groups),
+        ))
+
+def timing_deps(ctx, verilator_toolchain, timing, systemc = False):
+    """Return runtime/link dependencies for the requested timing/systemc mode.
+
+    Args:
+        ctx: Rule context providing transitioned runtime attributes.
+        verilator_toolchain: Resolved Verilator toolchain info for the current target.
+        timing: Whether the generated model requires Verilator timing runtime support.
+        systemc: Whether the generated model also needs the SystemC runtime dependency.
+
+    Returns:
+        A list of dependencies to use for C++ compilation and linking.
+    """
+    runtime = ctx.attr._verilated_timing_runtime if timing else ctx.attr._verilated_runtime
+    deps = list(runtime) if type(runtime) == "list" else [runtime]
+    deps.extend(verilator_toolchain.deps)
+    if systemc:
+        deps.append(verilator_toolchain.systemc)
+    return deps
+
+def timing_copts(ctx, timing):
+    """Return compiler options needed for generated timing-enabled C++.
+
+    Args:
+        ctx: Rule context used to inspect the active C++ toolchain.
+        timing: Whether the generated model requires Verilator timing runtime support.
+
+    Returns:
+        A list of extra compiler options required for the generated C++ sources.
+    """
+    if not timing:
+        return []
+
+    cc_toolchain = find_cpp_toolchain(ctx)
+    if cc_toolchain.compiler in _MSVC_LIKE_COMPILERS:
+        return ["/std:c++20"]
+    return ["-std=c++20"]

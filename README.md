@@ -59,6 +59,7 @@ verilator_cc_library(
     name = "my_verilated_lib",
     module = ":my_module",
     module_top = "my_top_module",
+    timing = True,  # Optional: enable Verilator timing support
     trace = True,  # Enable waveform tracing
     vopts = [
         "-Wall",
@@ -84,6 +85,7 @@ verilator_cc_library(
     module = ":my_module",
     module_top = "my_top_module",
     systemc = True,  # Generate SystemC output
+    timing = True,
     trace = True,
     vopts = ["-Wall"],
 )
@@ -139,6 +141,7 @@ verilator_hierarchical_plan(
     module = ":full_design_sv",
     module_top = "top",
     blocks = ["block_a", "block_b"],
+    timing = True,
 )
 
 verilator_hierarchical_block_cc_library(
@@ -168,6 +171,7 @@ verilator_hierarchical_top_cc_library(
 
 Notes:
 - `blocks` is the list of Verilog module names to compile as independent hierarchical blocks.
+- Use the dedicated `timing` attribute instead of passing `--timing` or `--no-timing` through `vopts`.
 - `module` on `verilator_hierarchical_top_cc_library` should contain only top-local sources; keep block sources in their own `verilog_library` targets to preserve cache isolation.
 - The rules auto-generate the temporary `.vlt` hierarchy control file; users do not need to maintain it manually.
 
