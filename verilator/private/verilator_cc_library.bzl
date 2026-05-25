@@ -4,39 +4,50 @@ load("@rules_cc//cc:defs.bzl", "CcInfo")
 load("@rules_verilog//verilog:defs.bzl", "VerilogInfo")
 load(
     ":common.bzl",
+    "add_common_verilator_args",
     "cc_compile_and_link_static_library",
     "collect_verilog_inputs",
     "copy_generated_cpp_and_hpp",
-    "only_sv",
-    "reject_managed_vopts",
     "timing_copts",
     "timing_deps",
+    "validate_verilator_options",
     "verilator_env",
     "verilator_no_timing_transition",
     "verilator_timing_transition",
 )
+load(
+    ":hierarchical.bzl",
+    "compile_hierarchical_verilator_library",
+)
+load(
+    ":verilog_graph.bzl",
+    "resolve_module_top",
+    "verilator_verilog_graph_aspect",
+)
 
 def _verilator_cc_library_impl(ctx):
     verilator_toolchain = ctx.toolchains["//verilator:toolchain_type"]
+    module_top = resolve_module_top(ctx.attr.module, ctx.attr.module_top, ctx.label)
+    if ctx.attr.hierarchical:
+        if ctx.attr.systemc:
+            fail("hierarchical Verilation currently supports only C++ output; set systemc = False.")
+        return compile_hierarchical_verilator_library(ctx, verilator_toolchain, module_top)
 
+    # Flat mode keeps the original behavior: flatten the Verilog graph, run
+    # Verilator once, then compile the generated C++ as a single static library.
     verilog_inputs = collect_verilog_inputs(ctx.attr.module)
     verilator_output = ctx.actions.declare_directory(ctx.label.name + "-gen")
-    prefix = "V" + ctx.attr.module_top
+    prefix = "V" + module_top
     timing = ctx.attr.timing
 
-    reject_managed_vopts(verilator_toolchain.extra_vopts, "verilator_toolchain.extra_vopts")
-    reject_managed_vopts(ctx.attr.vopts, "{}.vopts".format(ctx.label))
+    validate_verilator_options(verilator_toolchain, ctx.attr.vopts, ctx.label)
 
     args = ctx.actions.args()
     args.add(verilator_toolchain.verilator)
     args.add("--no-std")
     args.add("--Mdir", verilator_output.path)
-    args.add("--top-module", ctx.attr.module_top)
+    args.add("--top-module", module_top)
     args.add("--prefix", prefix)
-    if timing:
-        args.add("--timing")
-    if ctx.attr.trace:
-        args.add("--trace")
     if ctx.attr.systemc:
         if not verilator_toolchain.systemc:
             fail("SystemC output requested but toolchain does not provide SystemC. " +
@@ -46,10 +57,15 @@ def _verilator_cc_library_impl(ctx):
     else:
         args.add("--cc")
 
-    args.add_all(verilog_inputs.includes, format_each = "-I%s")
-    args.add_all(verilog_inputs.verilog_files, expand_directories = True, map_each = only_sv)
-    args.add_all(verilator_toolchain.extra_vopts)
-    args.add_all(ctx.attr.vopts, expand_directories = False)
+    add_common_verilator_args(
+        args,
+        verilator_toolchain,
+        timing = timing,
+        trace = ctx.attr.trace,
+        includes = verilog_inputs.includes,
+        verilog_files = verilog_inputs.verilog_files,
+        vopts = ctx.attr.vopts,
+    )
 
     ctx.actions.run(
         arguments = [args],
@@ -89,14 +105,19 @@ verilator_cc_library = rule(
             doc = "List of additional compilation flags",
             default = [],
         ),
+        "hierarchical": attr.bool(
+            doc = "Enable automatic hierarchical Verilation using verilog_library top_module boundaries.",
+            default = False,
+        ),
         "module": attr.label(
             doc = "The top level module target to verilate.",
             providers = [VerilogInfo],
             mandatory = True,
+            aspects = [verilator_verilog_graph_aspect],
         ),
         "module_top": attr.string(
-            doc = "The name of the verilog module to verilate.",
-            mandatory = True,
+            doc = "Optional top module override. Defaults to module[VerilogInfo].top_module when omitted.",
+            default = "",
         ),
         "systemc": attr.bool(
             doc = "Generate SystemC code.",
@@ -121,6 +142,12 @@ verilator_cc_library = rule(
             doc = "CC compiler.",
             default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
         ),
+        "_copy_file": attr.label(
+            doc = "A tool for copying a single file out of a tree artifact.",
+            cfg = "exec",
+            executable = True,
+            default = Label("//verilator/private:verilator_copy_file"),
+        ),
         "_copy_tree": attr.label(
             doc = "A tool for copying a tree of files",
             cfg = "exec",
@@ -135,12 +162,12 @@ verilator_cc_library = rule(
         ),
         "_verilated_runtime": attr.label(
             cfg = verilator_no_timing_transition,
-            default = Label("@verilator//:verilated"),
+            default = Label("//verilator:verilated_runtime"),
             providers = [CcInfo],
         ),
         "_verilated_timing_runtime": attr.label(
             cfg = verilator_timing_transition,
-            default = Label("@verilator//:verilated"),
+            default = Label("//verilator:verilated_runtime"),
             providers = [CcInfo],
         ),
     },

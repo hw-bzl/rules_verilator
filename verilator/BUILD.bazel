@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(":defs.bzl", "verilator_toolchain")
 
 package(
@@ -22,6 +23,21 @@ package(
 toolchain_type(
     name = "toolchain_type",
     visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "linux",
+    constraint_values = ["@platforms//os:linux"],
+)
+
+cc_library(
+    name = "verilated_runtime",
+    linkopts = select({
+        ":linux": ["-latomic"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = ["@verilator//:verilated"],
 )
 
 verilator_toolchain(

@@ -14,7 +14,7 @@ Bazel rules for Verilator-based SystemVerilog simulation using the Bazel Central
 
 ## Installation
 
-### Default Installation (C++ Only)
+### Default C++ toolchain
 
 Add the following to your `MODULE.bazel`:
 
@@ -33,18 +33,12 @@ If you need SystemC output, add the SystemC dependency and register the SystemC-
 
 ```starlark
 bazel_dep(name = "rules_verilator", version = "0.3.3")
-bazel_dep(name = "systemc", version = "3.0.2")
 
 # Register the SystemC-enabled toolchain
 register_toolchains(
     "@rules_verilator//verilator:verilator_toolchain_with_systemc",
 )
 ```
-
-> [!TIP]
-> Verilator and SystemC are not bundled with `rules_verilator`. Users must explicitly declare them in their own `MODULE.bazel`. SystemC is **optional** and only required if you set `systemc = True` in your `verilator_cc_library` targets.
->
-> `rules_verilator` `0.3.0+` requires the refactored `rules_verilog` provider interface (`rules_verilog >= 1.0.0`).
 
 ## Usage
 
@@ -54,13 +48,19 @@ You can check `verilator/tests` for examples as well.
 
 ```starlark
 load("@rules_verilator//verilator:defs.bzl", "verilator_cc_library")
+load("@rules_verilog//verilog:defs.bzl", "verilog_library")
+
+verilog_library(
+    name = "my_module",
+    srcs = ["my_top_module.sv"],
+    top_module = "my_top_module",
+)
 
 verilator_cc_library(
     name = "my_verilated_lib",
     module = ":my_module",
-    module_top = "my_top_module",
-    timing = True,  # Optional: enable Verilator timing support
-    trace = True,  # Enable waveform tracing
+    timing = True,  # Enable timing support (--timing)
+    trace = True,   # Enable waveform tracing (--trace)
     vopts = [
         "-Wall",
         "--x-assign fast",
@@ -75,15 +75,23 @@ cc_binary(
 )
 ```
 
+`module_top` remains available as an override when you need to verilate a different top than the one declared on the `verilog_library`, but the recommended style is to put the canonical top in `verilog_library(top_module = ...)`.
+
 ### Verilator SystemC Library
 
 ```starlark
 load("@rules_verilator//verilator:defs.bzl", "verilator_cc_library")
+load("@rules_verilog//verilog:defs.bzl", "verilog_library")
+
+verilog_library(
+    name = "my_module",
+    srcs = ["my_top_module.sv"],
+    top_module = "my_top_module",
+)
 
 verilator_cc_library(
     name = "my_verilated_sc_lib",
     module = ":my_module",
-    module_top = "my_top_module",
     systemc = True,  # Generate SystemC output
     timing = True,
     trace = True,
@@ -99,27 +107,28 @@ cc_binary(
 
 ### Hierarchical Verilation
 
-For [verilator's hierarchical verilation](https://verilator.org/guide/latest/verilating.html#hierarchical-verilation), use the dedicated hierarchical rules. The regular `verilator_cc_library` remains unchanged.
+For [verilator's hierarchical verilation](https://verilator.org/guide/latest/verilating.html#hierarchical-verilation), enable `hierarchical = True` on `verilator_cc_library`.
 
-These rules let large designs be verilated block-by-block instead of recompiling the full design on every change, which improves cache reuse, reduces incremental build time, and keeps top-level integration separate from block implementation details.
+Hierarchical Verilation splits a large design into multiple Verilated libraries instead of compiling the whole RTL graph as one flat model. The top-level model then calls into the generated models for selected lower-level blocks. This usually helps when a design is large enough that flat Verilation becomes expensive in time or memory, and when incremental rebuilds should reuse cached results for unchanged blocks.
+
+The trade-off is that hierarchical mode is **less globally optimized** than flat Verilation. It may reduce simulation performance, and it inherits Verilator's hierarchy-boundary restrictions. Use it when build scalability matters more than getting the most aggressive whole-design scheduling.
+
+This rule discovers hierarchy automatically from `verilog_library(top_module = ...)` declarations. A library with a non-empty `top_module` becomes a hierarchy boundary. A library without `top_module` stays transparent and is compiled into the nearest ancestor boundary.
 
 ```starlark
-load(
-    "@rules_verilator//verilator:defs.bzl",
-    "verilator_hierarchical_block_cc_library",
-    "verilator_hierarchical_plan",
-    "verilator_hierarchical_top_cc_library",
-)
+load("@rules_verilator//verilator:defs.bzl", "verilator_cc_library")
 load("@rules_verilog//verilog:defs.bzl", "verilog_library")
 
 verilog_library(
     name = "block_a_sv",
     srcs = ["block_a.sv"],
+    top_module = "block_a",
 )
 
 verilog_library(
     name = "block_b_sv",
     srcs = ["block_b.sv"],
+    top_module = "block_b",
 )
 
 verilog_library(
@@ -134,46 +143,36 @@ verilog_library(
         ":block_b_sv",
         ":top_local_sv",
     ],
+    top_module = "top",
 )
 
-verilator_hierarchical_plan(
-    name = "top_plan",
-    module = ":full_design_sv",
-    module_top = "top",
-    blocks = ["block_a", "block_b"],
-    timing = True,
-)
-
-verilator_hierarchical_block_cc_library(
-    name = "block_a_verilated",
-    plan = ":top_plan",
-    block = "block_a",
-    module = ":block_a_sv",
-)
-
-verilator_hierarchical_block_cc_library(
-    name = "block_b_verilated",
-    plan = ":top_plan",
-    block = "block_b",
-    module = ":block_b_sv",
-)
-
-verilator_hierarchical_top_cc_library(
+verilator_cc_library(
     name = "top_verilated",
-    plan = ":top_plan",
-    module = ":top_local_sv",
-    block_deps = [
-        ":block_a_verilated",
-        ":block_b_verilated",
-    ],
+    module = ":full_design_sv",
+    hierarchical = True, # Enable hierarchical verilation
 )
 ```
 
-Notes:
-- `blocks` is the list of Verilog module names to compile as independent hierarchical blocks.
+How the top is chosen:
+
+- `module_top` on `verilator_cc_library`, if set, overrides everything else.
+- Otherwise the rule uses `module[VerilogInfo].top_module`.
+- If neither is set, analysis fails.
+
+How child libraries are treated:
+
+- `top_module != ""`: the child becomes its own hierarchical node.
+- `top_module == ""`: the child stays transparent and is merged into the nearest ancestor node.
+- The root target is always represented by the resolved top of the current `verilator_cc_library`, even if that top came from `module_top` override.
+
+Important behavior:
+
+- Hierarchy recognition only looks at the current `module` graph. Other `verilator_cc_library` targets do not affect it.
+- `hierarchical = True` changes the compile strategy for this target only. The same `verilog_library` graph can still be consumed by a separate flat `verilator_cc_library`.
+- Rebuilds happen at hierarchy-node granularity: if one child node changes, unchanged sibling nodes can still be reused from cache, while the changed node and its ancestor chain are rebuilt.
 - Use the dedicated `timing` attribute instead of passing `--timing` or `--no-timing` through `vopts`.
-- `module` on `verilator_hierarchical_top_cc_library` should contain only top-local sources; keep block sources in their own `verilog_library` targets to preserve cache isolation.
-- The rules auto-generate the temporary `.vlt` hierarchy control file; users do not need to maintain it manually.
+- `systemc = True` is supported only for flat Verilation today.
+- The rule auto-generates the temporary `.vlt` control file. Users do not need to maintain it manually.
 
 ## Key Differences from rules_hdl
 

@@ -20,17 +20,6 @@ load(
     _cc_compile_and_link_static_library = "cc_compile_and_link_static_library",
 )
 load(
-    "//verilator/private:hierarchical.bzl",
-    _verilator_hierarchical_block_cc_library = "verilator_hierarchical_block_cc_library",
-    _verilator_hierarchical_plan = "verilator_hierarchical_plan",
-    _verilator_hierarchical_top_cc_library = "verilator_hierarchical_top_cc_library",
-)
-load(
-    "//verilator/private:providers.bzl",
-    _VerilatorHierBlockInfo = "VerilatorHierBlockInfo",
-    _VerilatorHierPlanInfo = "VerilatorHierPlanInfo",
-)
-load(
     "//verilator/private:toolchain.bzl",
     _verilator_toolchain = "verilator_toolchain",
 )
@@ -40,11 +29,6 @@ load(
 )
 
 cc_compile_and_link_static_library = _cc_compile_and_link_static_library
-VerilatorHierPlanInfo = _VerilatorHierPlanInfo
-VerilatorHierBlockInfo = _VerilatorHierBlockInfo
 
 verilator_cc_library = _verilator_cc_library
-verilator_hierarchical_plan = _verilator_hierarchical_plan
-verilator_hierarchical_block_cc_library = _verilator_hierarchical_block_cc_library
-verilator_hierarchical_top_cc_library = _verilator_hierarchical_top_cc_library
 verilator_toolchain = _verilator_toolchain
