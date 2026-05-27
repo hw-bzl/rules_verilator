@@ -2,8 +2,7 @@ bcr_test_module:
   module_path: ""
   matrix:
     platform:
-      - debian10
-      - ubuntu2004
+      - ubuntu2204
       - macos
     bazel: [7.x, 8.x, 9.x]
   tasks:
