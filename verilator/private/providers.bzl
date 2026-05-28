@@ -1,22 +1,15 @@
 """Providers shared across Verilator rules."""
 
-VerilatorHierPlanInfo = provider(
-    doc = "Hierarchical Verilator discovery outputs shared by block/top rules.",
+VerilatorVerilogGraphInfo = provider(
+    doc = "Verilog library graph retained for hierarchical Verilation.",
     fields = {
-        "block_args": "A dict mapping hierarchical block names to args files.",
-        "control_file": "Auto-generated .vlt file shared by all hierarchical actions.",
-        "module_top": "Top module name for the hierarchical design.",
-        "timing": "Whether Verilator timing support is enabled.",
-        "top_args": "Args file for the hierarchical top compilation.",
-        "trace": "Whether tracing is enabled.",
-        "vopts": "User-provided Verilator options shared by all hierarchical actions.",
-    },
-)
-
-VerilatorHierBlockInfo = provider(
-    doc = "Outputs produced by a compiled hierarchical child block.",
-    fields = {
-        "block": "Hierarchical block name.",
-        "wrapper_sv": "Generated wrapper SystemVerilog file consumed by the top rule.",
+        "data": "List[File]: Local data files declared on this verilog_library.",
+        "direct_deps": "List[VerilatorVerilogGraphInfo]: Direct verilog_library dependencies.",
+        "hdrs": "List[File]: Local Verilog/SV headers declared on this library.",
+        "includes": "List[str]: Local include search paths declared on this library.",
+        "label": "Label: The verilog_library label that produced this node.",
+        "postorder_libraries": "List[struct]: Transitive verilog_library entries in postorder, including this node.",
+        "srcs": "List[File]: Local Verilog/SV source files declared on this library.",
+        "top_module": "str: The library-local top module declaration.",
     },
 )

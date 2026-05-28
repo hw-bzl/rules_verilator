@@ -16,9 +16,11 @@ build --cxxopt "-std=c++17"
 build --cxxopt "-ffp-contract=off"
 build --host_cxxopt "-std=c++17"
 build --host_cxxopt "-ffp-contract=off"
-build --crosstool_top=@llvm_toolchain//:toolchain
+build --repo_env=CC=clang
+build --repo_env=CXX=clang++
+build --action_env=CC=clang
+build --action_env=CXX=clang++
 
-build:ciremotebuild --crosstool_top=@llvm_toolchain//:toolchain
 build:ciremotebuild --bes_backend=grpcs://cloud.buildbuddy.io
 build:ciremotebuild --remote_cache=https://storage.googleapis.com/bazel-cache-rules-hdl
 build:ciremotebuild --google_default_credentials
@@ -27,7 +29,6 @@ build:ciremotebuild --tls_client_certificate=/root/.ssh/buildbuddy-cert.pem
 build:ciremotebuild --tls_client_key=/root/.ssh/buildbuddy-key.pem
 build:ciremotebuild --build_metadata=VISIBILITY=PUBLIC
 
-test:ciremotebuild --crosstool_top=@llvm_toolchain//:toolchain
 test:ciremotebuild --bes_backend=grpcs://cloud.buildbuddy.io
 test:ciremotebuild --remote_cache=grpcs://cloud.buildbuddy.io
 test:ciremotebuild --remote_download_outputs=all
