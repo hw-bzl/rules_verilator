@@ -19,7 +19,7 @@ Bazel rules for Verilator-based SystemVerilog simulation using the Bazel Central
 Add the following to your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "rules_verilator", version = "0.3.3.bcr.1")
+bazel_dep(name = "rules_verilator", version = "1.0.0")
 register_toolchains(
     "@rules_verilator//verilator:verilator_toolchain",
 )
@@ -32,7 +32,7 @@ The default toolchain supports C++ output only and does not require SystemC.
 If you need SystemC output, add the SystemC dependency and register the SystemC-enabled toolchain:
 
 ```starlark
-bazel_dep(name = "rules_verilator", version = "0.3.3.bcr.1")
+bazel_dep(name = "rules_verilator", version = "1.0.0")
 
 # Register the SystemC-enabled toolchain
 register_toolchains(
@@ -97,7 +97,7 @@ verilator_cc_library(
     module = ":my_module",
     systemc = True,  # Generate SystemC output
     timing = True,
-    trace_mode = "vcd",  # Enable waveform tracing ("vcd", "fst", "saif")
+    trace_mode = "vcd",
     vopts = ["-Wall"],
 )
 
@@ -173,9 +173,6 @@ Important behavior:
 - Hierarchy recognition only looks at the current `module` graph. Other `verilator_cc_library` targets do not affect it.
 - `hierarchical = True` changes the compile strategy for this target only. The same `verilog_library` graph can still be consumed by a separate flat `verilator_cc_library`.
 - Rebuilds happen at hierarchy-node granularity: if one child node changes, unchanged sibling nodes can still be reused from cache, while the changed node and its ancestor chain are rebuilt.
-- Use the dedicated `timing` attribute instead of passing `--timing` or `--no-timing` through `vopts`.
-- Use the dedicated `trace_mode` attribute instead of passing `--trace`, `--trace-vcd`, `--trace-fst`, or `--trace-saif` through `vopts`.
-- `trace = True` remains supported as a compatibility alias for `trace_mode = "vcd"`.
 - `systemc = True` is supported only for flat Verilation today.
 - The rule auto-generates the temporary `.vlt` control file. Users do not need to maintain it manually.
 
