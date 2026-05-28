@@ -10,6 +10,7 @@ load(
     "only_sv",
     "timing_copts",
     "timing_deps",
+    "trace_defines",
     "validate_verilator_options",
     "verilator_env",
 )
@@ -27,7 +28,7 @@ def _copy_file_from_tree(ctx, generated_dir, output, relative_paths):
         mnemonic = "VerilatorCopyFile",
     )
 
-def _run_hierarchical_discovery(ctx, verilator_toolchain, root_module_top, node_plan):
+def _run_hierarchical_discovery(ctx, verilator_toolchain, root_module_top, node_plan, trace_mode):
     # Run Verilator once in discovery mode to ask it how to compile each
     # hierarchical node. The resulting `__hierMkJsonArgs.f` files drive all
     # subsequent per-node compile actions.
@@ -58,7 +59,7 @@ def _run_hierarchical_discovery(ctx, verilator_toolchain, root_module_top, node_
         args,
         verilator_toolchain,
         timing = ctx.attr.timing,
-        trace = ctx.attr.trace,
+        trace_mode = trace_mode,
         includes = verilog_inputs.includes,
         verilog_files = verilog_inputs.verilog_files,
         vopts = ctx.attr.vopts,
@@ -94,7 +95,7 @@ def _run_hierarchical_discovery(ctx, verilator_toolchain, root_module_top, node_
         control_file = control_file,
     )
 
-def _compile_hierarchy_node(ctx, verilator_toolchain, root_module_top, node_name, node, child_results, discovery):
+def _compile_hierarchy_node(ctx, verilator_toolchain, root_module_top, node_name, node, child_results, discovery, trace_mode):
     generated_dir = ctx.actions.declare_directory(ctx.label.name + "_" + node_name + "_gen")
     output_stem = ctx.label.name + "_" + node_name
     is_root = node_name == root_module_top
@@ -118,7 +119,7 @@ def _compile_hierarchy_node(ctx, verilator_toolchain, root_module_top, node_name
         args,
         verilator_toolchain,
         timing = ctx.attr.timing,
-        trace = ctx.attr.trace,
+        trace_mode = trace_mode,
         includes = node["includes"],
         verilog_files = node["compile_files"],
         vopts = ctx.attr.vopts,
@@ -148,7 +149,7 @@ def _compile_hierarchy_node(ctx, verilator_toolchain, root_module_top, node_name
         )
 
     copied_outputs = copy_generated_cpp_and_hpp(ctx, generated_dir, output_stem = output_stem)
-    defines = ["VM_TRACE"] if ctx.attr.trace else []
+    defines = trace_defines(trace_mode)
     deps = timing_deps(
         ctx,
         verilator_toolchain,
@@ -177,20 +178,21 @@ def _compile_hierarchy_node(ctx, verilator_toolchain, root_module_top, node_name
         wrapper_sv = wrapper_sv,
     )
 
-def compile_hierarchical_verilator_library(ctx, verilator_toolchain, root_module_top):
+def compile_hierarchical_verilator_library(ctx, verilator_toolchain, root_module_top, trace_mode):
     """Compile a verilog_library graph using automatic hierarchy discovery.
 
     Args:
         ctx: Rule context for the owning `verilator_cc_library`.
         verilator_toolchain: The resolved Verilator toolchain info.
         root_module_top: The resolved root top module name for this build.
+        trace_mode: The selected trace mode for all discovery and node compile actions.
 
     Returns:
         A `[DefaultInfo, CcInfo]` pair for the root hierarchical library.
     """
     graph_info = ctx.attr.module[VerilatorVerilogGraphInfo]
     node_plan = build_hierarchy_plan(graph_info, root_module_top)
-    discovery = _run_hierarchical_discovery(ctx, verilator_toolchain, root_module_top, node_plan)
+    discovery = _run_hierarchical_discovery(ctx, verilator_toolchain, root_module_top, node_plan, trace_mode)
 
     compiled_nodes = {}
 
@@ -207,6 +209,7 @@ def compile_hierarchical_verilator_library(ctx, verilator_toolchain, root_module
             node,
             child_results,
             discovery,
+            trace_mode,
         )
 
     root_result = compiled_nodes[root_module_top]

@@ -28,7 +28,19 @@ verilator_cc_library(
 verilator_cc_library(
     name = "adder_trace_verilator",
     module = ":adder",
+    trace_mode = "vcd",
+)
+
+verilator_cc_library(
+    name = "adder_trace_compat_verilator",
+    module = ":adder",
     trace = True,
+)
+
+verilator_cc_library(
+    name = "adder_fst_verilator",
+    module = ":adder",
+    trace_mode = "fst",
 )
 
 cc_test(
@@ -55,6 +67,24 @@ cc_test(
     srcs = ["adder_trace_test.cc"],
     deps = [
         ":adder_trace_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "adder_trace_compat_test",
+    srcs = ["adder_trace_test.cc"],
+    deps = [
+        ":adder_trace_compat_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "adder_fst_test",
+    srcs = ["adder_fst_test.cc"],
+    deps = [
+        ":adder_fst_verilator",
         "@googletest//:gtest_main",
     ],
 )
