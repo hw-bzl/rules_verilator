@@ -8,8 +8,10 @@ load(
     "cc_compile_and_link_static_library",
     "collect_verilog_inputs",
     "copy_generated_cpp_and_hpp",
+    "resolve_trace_mode",
     "timing_copts",
     "timing_deps",
+    "trace_defines",
     "validate_verilator_options",
     "verilator_env",
     "verilator_no_timing_transition",
@@ -28,10 +30,11 @@ load(
 def _verilator_cc_library_impl(ctx):
     verilator_toolchain = ctx.toolchains["//verilator:toolchain_type"]
     module_top = resolve_module_top(ctx.attr.module, ctx.attr.module_top, ctx.label)
+    trace_mode = resolve_trace_mode(ctx.attr.trace, ctx.attr.trace_mode, ctx.label)
     if ctx.attr.hierarchical:
         if ctx.attr.systemc:
             fail("hierarchical Verilation currently supports only C++ output; set systemc = False.")
-        return compile_hierarchical_verilator_library(ctx, verilator_toolchain, module_top)
+        return compile_hierarchical_verilator_library(ctx, verilator_toolchain, module_top, trace_mode)
 
     # Flat mode keeps the original behavior: flatten the Verilog graph, run
     # Verilator once, then compile the generated C++ as a single static library.
@@ -61,7 +64,7 @@ def _verilator_cc_library_impl(ctx):
         args,
         verilator_toolchain,
         timing = timing,
-        trace = ctx.attr.trace,
+        trace_mode = trace_mode,
         includes = verilog_inputs.includes,
         verilog_files = verilog_inputs.verilog_files,
         vopts = ctx.attr.vopts,
@@ -79,7 +82,7 @@ def _verilator_cc_library_impl(ctx):
     )
 
     copied_outputs = copy_generated_cpp_and_hpp(ctx, verilator_output)
-    defines = ["VM_TRACE"] if ctx.attr.trace else []
+    defines = trace_defines(trace_mode)
     deps = timing_deps(
         ctx,
         verilator_toolchain,
@@ -128,8 +131,13 @@ verilator_cc_library = rule(
             default = False,
         ),
         "trace": attr.bool(
-            doc = "Enable tracing for Verilator",
+            doc = "Deprecated compatibility alias for `trace_mode = \"vcd\"`.",
             default = False,
+        ),
+        "trace_mode": attr.string(
+            doc = "Waveform trace mode: `none`, `vcd`, `fst`, or `saif`.",
+            default = "none",
+            values = ["none", "vcd", "fst", "saif"],
         ),
         "vopts": attr.string_list(
             doc = "Additional command line options to pass to Verilator",

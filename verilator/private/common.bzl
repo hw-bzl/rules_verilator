@@ -15,7 +15,22 @@ _MANAGED_VOPT_TO_ATTR = {
     "--no-timing": "timing",
     "--sc": "systemc",
     "--timing": "timing",
-    "--trace": "trace",
+    "--trace": "trace_mode",
+    "--trace-fst": "trace_mode",
+    "--trace-saif": "trace_mode",
+    "--trace-vcd": "trace_mode",
+}
+_TRACE_MODE_TO_VERILATOR_FLAG = {
+    "fst": "--trace-fst",
+    "none": None,
+    "saif": "--trace-saif",
+    "vcd": "--trace-vcd",
+}
+_TRACE_MODE_TO_DEFINES = {
+    "fst": ["VM_TRACE", "VM_TRACE_FST"],
+    "none": [],
+    "saif": ["VM_TRACE", "VM_TRACE_SAIF"],
+    "vcd": ["VM_TRACE", "VM_TRACE_VCD"],
 }
 
 def _verilator_timing_transition_impl(_settings, _attr):
@@ -192,11 +207,32 @@ def validate_verilator_options(verilator_toolchain, vopts, owner):
     reject_managed_vopts(verilator_toolchain.extra_vopts, "verilator_toolchain.extra_vopts")
     reject_managed_vopts(vopts, "{}.vopts".format(owner))
 
+def resolve_trace_mode(trace, trace_mode, owner):
+    """Resolve the effective trace mode, honoring the deprecated `trace` alias.
+
+    Args:
+        trace: Whether the deprecated boolean tracing alias was enabled.
+        trace_mode: The requested structured trace mode.
+        owner: Human-readable label used in validation errors.
+
+    Returns:
+        The effective trace mode after applying compatibility behavior.
+    """
+    if trace:
+        if trace_mode == "none":
+            return "vcd"
+        if trace_mode != "vcd":
+            fail(
+                "{} sets deprecated `trace = True` together with incompatible `trace_mode = \"{}\"`. ".format(owner, trace_mode) +
+                "Use `trace_mode` alone, or keep `trace = True` only for VCD compatibility.",
+            )
+    return trace_mode
+
 def add_common_verilator_args(
         args,
         verilator_toolchain,
         timing,
-        trace,
+        trace_mode,
         includes,
         verilog_files,
         vopts):
@@ -206,19 +242,24 @@ def add_common_verilator_args(
         args: The action args object to append flags to.
         verilator_toolchain: The resolved Verilator toolchain info.
         timing: Whether to enable Verilator timing support.
-        trace: Whether to enable Verilator tracing support.
+        trace_mode: Which Verilator tracing mode to enable.
         includes: Include search paths to pass as `-I` flags.
         verilog_files: Verilog/SystemVerilog source inputs for the action.
         vopts: Additional user-supplied Verilator options.
     """
     if timing:
         args.add("--timing")
-    if trace:
-        args.add("--trace")
+    trace_flag = _TRACE_MODE_TO_VERILATOR_FLAG[trace_mode]
+    if trace_flag != None:
+        args.add(trace_flag)
     args.add_all(includes, format_each = "-I%s")
     args.add_all(verilog_files, expand_directories = True, map_each = only_sv)
     args.add_all(verilator_toolchain.extra_vopts)
     args.add_all(vopts, expand_directories = False)
+
+def trace_defines(trace_mode):
+    """Return the compile-time trace defines required by the selected trace mode."""
+    return _TRACE_MODE_TO_DEFINES[trace_mode]
 
 def partition_verilog_inputs(files):
     """Split a file list into compile-time Verilog inputs and runtime files.

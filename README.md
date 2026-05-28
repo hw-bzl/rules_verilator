@@ -59,8 +59,8 @@ verilog_library(
 verilator_cc_library(
     name = "my_verilated_lib",
     module = ":my_module",
-    timing = True,  # Enable timing support (--timing)
-    trace = True,   # Enable waveform tracing (--trace)
+    timing = True,  # Enable timing support (--timing), optional
+    trace_mode = "vcd",  # Enable waveform tracing ("vcd", "fst", "saif"), optional
     vopts = [
         "-Wall",
         "--x-assign fast",
@@ -75,7 +75,10 @@ cc_binary(
 )
 ```
 
-`module_top` remains available as an override when you need to verilate a different top than the one declared on the `verilog_library`, but the recommended style is to put the canonical top in `verilog_library(top_module = ...)`.
+- `module_top` remains available as an override when you need to verilate a different top than the one declared on the `verilog_library`, but the recommended style is to put the canonical top in `verilog_library(top_module = ...)`.
+- Use the dedicated `timing` attribute instead of passing `--timing` or `--no-timing` through `vopts`.
+- Use the dedicated `trace_mode` attribute instead of passing `--trace`, `--trace-vcd`, `--trace-fst`, or `--trace-saif` through `vopts`.
+- `trace = True` remains supported as a compatibility alias for `trace_mode = "vcd"`.
 
 ### Verilator SystemC Library
 
@@ -94,7 +97,7 @@ verilator_cc_library(
     module = ":my_module",
     systemc = True,  # Generate SystemC output
     timing = True,
-    trace = True,
+    trace_mode = "vcd",  # Enable waveform tracing ("vcd", "fst", "saif")
     vopts = ["-Wall"],
 )
 
@@ -171,6 +174,8 @@ Important behavior:
 - `hierarchical = True` changes the compile strategy for this target only. The same `verilog_library` graph can still be consumed by a separate flat `verilator_cc_library`.
 - Rebuilds happen at hierarchy-node granularity: if one child node changes, unchanged sibling nodes can still be reused from cache, while the changed node and its ancestor chain are rebuilt.
 - Use the dedicated `timing` attribute instead of passing `--timing` or `--no-timing` through `vopts`.
+- Use the dedicated `trace_mode` attribute instead of passing `--trace`, `--trace-vcd`, `--trace-fst`, or `--trace-saif` through `vopts`.
+- `trace = True` remains supported as a compatibility alias for `trace_mode = "vcd"`.
 - `systemc = True` is supported only for flat Verilation today.
 - The rule auto-generates the temporary `.vlt` control file. Users do not need to maintain it manually.
 
