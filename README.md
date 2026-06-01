@@ -11,6 +11,7 @@ Bazel rules for Verilator-based SystemVerilog simulation using the Bazel Central
 - Supports both C++ and SystemC output
 - Support incremental hierarchical builds
 - Optional waveform tracing support
+- Repo-wide `verilator --lint-only` aspect
 
 ## Installation
 
@@ -175,6 +176,58 @@ Important behavior:
 - Rebuilds happen at hierarchy-node granularity: if one child node changes, unchanged sibling nodes can still be reused from cache, while the changed node and its ancestor chain are rebuilt.
 - `systemc = True` is supported only for flat Verilation today.
 - The rule auto-generates the temporary `.vlt` control file. Users do not need to maintain it manually.
+
+### Lint Aspect
+
+`verilator_lint_aspect` runs `verilator --lint-only` on every target that provides `VerilogInfo`. It pays for itself in two cases the compile path doesn't cover:
+
+- **Intermediate libraries.** A `verilog_library` that's only ever consumed as a dependency (never wrapped in a `verilator_cc_library`) otherwise has nothing exercising it. The aspect lints it in isolation against its own `top_module`, so issues at a leaf module (unused signals, width truncation, incomplete cases) surface where they live instead of getting masked by the integrated top.
+- **A stricter, repo-wide flag set.** Compile `vopts` are tuned per target for buildability. The aspect's flags come from the new `lint_vopts` attr on `verilator_toolchain` (default `["-Wall"]`), so CI can enforce a stricter posture without changing how any individual `verilator_cc_library` builds.
+
+It's also cheap — no C++ codegen, no link — so it's reasonable to fan out over `//...` on every build.
+
+#### Running it
+
+```bash
+bazel build \
+    --aspects=@rules_verilator//verilator:defs.bzl%verilator_lint_aspect \
+    --output_groups=verilator_lint_checks \
+    //...
+```
+
+Clean lint runs produce no output; failures replay Verilator's diagnostics to stderr and fail the action with Verilator's exit code.
+
+#### Configuring lint flags
+
+Set `lint_vopts` on your `verilator_toolchain` to override the default:
+
+```starlark
+verilator_toolchain(
+    name = "verilator_toolchain_impl",
+    verilator = "@verilator//:verilator_executable",
+    lint_vopts = [
+        "-Wall",
+        "-Wpedantic",
+    ],
+)
+```
+
+The same managed-flag validation that applies to `extra_vopts` and `vopts` applies here — `--cc`, `--sc`, `--timing`, and `--trace*` are rejected; use the dedicated rule attrs.
+
+#### Skipping individual targets
+
+Tag a target with `no-lint` or `no-verilator-lint` to skip it during aspect runs. Underscores and hyphens are interchangeable, so `no_lint` and `no_verilator_lint` also work:
+
+```starlark
+verilog_library(
+    name = "legacy_block",
+    srcs = ["legacy.sv"],
+    top_module = "legacy_block",
+    tags = ["no-verilator-lint"],
+)
+```
+
+Targets without a `top_module` are skipped automatically — they can't be linted in isolation.
 
 ## Key Differences from rules_hdl
 
