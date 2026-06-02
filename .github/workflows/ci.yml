@@ -32,3 +32,11 @@ jobs:
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel-version }}
         run: bazel test //... --test_output=errors
+
+      - name: Verilator lint aspect
+        env:
+          USE_BAZEL_VERSION: ${{ matrix.bazel-version }}
+        run: |
+          bazel build //... \
+            --aspects=//verilator:defs.bzl%verilator_lint_aspect \
+            --output_groups=verilator_lint_checks

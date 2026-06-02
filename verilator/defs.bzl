@@ -27,8 +27,13 @@ load(
     "//verilator/private:verilator_cc_library.bzl",
     _verilator_cc_library = "verilator_cc_library",
 )
+load(
+    "//verilator/private:verilator_lint_aspect.bzl",
+    _verilator_lint_aspect = "verilator_lint_aspect",
+)
 
 cc_compile_and_link_static_library = _cc_compile_and_link_static_library
 
 verilator_cc_library = _verilator_cc_library
+verilator_lint_aspect = _verilator_lint_aspect
 verilator_toolchain = _verilator_toolchain

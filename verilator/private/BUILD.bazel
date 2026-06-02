@@ -17,3 +17,9 @@ cc_binary(
     srcs = ["verilator_process_wrapper.cc"],
     visibility = ["//visibility:public"],
 )
+
+cc_binary(
+    name = "verilator_lint_wrapper",
+    srcs = ["verilator_lint_wrapper.cc"],
+    visibility = ["//visibility:public"],
+)
