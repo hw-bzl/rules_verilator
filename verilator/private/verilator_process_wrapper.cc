@@ -12,6 +12,7 @@
 #include <windows.h>
 #else
 #include <dirent.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -116,9 +117,26 @@ int main(int argc, char* argv[]) {
         cmd += part + " ";
     }
     int result = std::system(cmd.c_str());
+#ifdef _WIN32
     if (result != 0) {
         return result;
     }
+#else
+    // std::system returns a wait status, not an exit code. Returning it
+    // from main truncates exit(N) to (N << 8) & 0xFF == 0, so a cleanly
+    // failing verilator run is reported to Bazel as success with a
+    // partial or empty --Mdir tree.
+    if (result == -1) {
+        std::cerr << "Error: Failed to launch command." << std::endl;
+        return 127;
+    }
+    if (WIFSIGNALED(result)) {
+        return 128 + WTERMSIG(result);
+    }
+    if (WEXITSTATUS(result) != 0) {
+        return WEXITSTATUS(result);
+    }
+#endif
 
     // Delete any non-deterministic files.
     if (std::getenv("VERILATOR_AVOID_NONDETERMINISTIC_OUTPUTS") != nullptr) {
