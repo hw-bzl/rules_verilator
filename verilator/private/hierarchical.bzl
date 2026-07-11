@@ -110,8 +110,6 @@ def _compile_hierarchy_node(ctx, verilator_toolchain, root_module_top, node_name
         args.add("--make", "json")
         args.add("--top-module", root_module_top)
         args.add("--prefix", hierarchical_prefix(root_module_top))
-        args.add("-Wno-DECLFILENAME")
-        args.add("-Wno-UNUSEDSIGNAL")
     args.add("--Mdir", generated_dir.path)
     args.add("-f", discovery.args_files[node_name].path)
     args.add_all([child.wrapper_sv for child in child_results], expand_directories = True, map_each = only_sv)
@@ -124,6 +122,12 @@ def _compile_hierarchy_node(ctx, verilator_toolchain, root_module_top, node_name
         verilog_files = node["compile_files"],
         vopts = ctx.attr.vopts,
     )
+
+    # Per-node hierarchical compiles consume generated child wrapper SV files.
+    # Keep these after common/user vopts so the default -Wall cannot re-enable
+    # warnings from Verilator-generated wrappers.
+    args.add("-Wno-DECLFILENAME")
+    args.add("-Wno-UNUSEDSIGNAL")
 
     inputs = list(node["compile_files"]) + [discovery.args_files[node_name], discovery.control_file]
     inputs.extend([child.wrapper_sv for child in child_results])
