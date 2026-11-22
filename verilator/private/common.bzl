@@ -151,6 +151,11 @@ def _only_hpp(f):
         return f.path
     return None
 
+def _only_classes_mk(f):
+    if f.basename.endswith("_classes.mk"):
+        return f.path
+    return None
+
 def _dedupe_preserve_order(items):
     """Return unique non-empty strings while preserving first-seen order."""
     seen = {}
@@ -300,6 +305,10 @@ def verilator_env(verilator_toolchain):
 def copy_generated_cpp_and_hpp(ctx, generated_dir, output_stem = None):
     """Split generated tree artifacts into C++ sources and public headers.
 
+    Sources follow Verilator's `<prefix>_classes.mk` when the tree has one: a
+    model without `VM_PARALLEL_BUILDS = 1` becomes one `<prefix>__ALL.cpp`
+    including the listed sources, which move to the header tree.
+
     Args:
         ctx: Rule context.
         generated_dir: Tree artifact containing Verilator-generated outputs.
@@ -317,6 +326,7 @@ def copy_generated_cpp_and_hpp(ctx, generated_dir, output_stem = None):
     cp_args.add(generated_hpp.path, format = "--hdr_output=%s")
     cp_args.add_all([generated_dir], map_each = _only_cpp, format_each = "--src=%s")
     cp_args.add_all([generated_dir], map_each = _only_hpp, format_each = "--hdr=%s")
+    cp_args.add_all([generated_dir], map_each = _only_classes_mk, format_each = "--classes=%s")
 
     ctx.actions.run(
         mnemonic = "VerilatorCopyTree",

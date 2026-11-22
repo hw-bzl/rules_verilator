@@ -1,1 +1,2 @@
 *.bazel                  linguist-language=Starlark
+verilator/tests/copy_tree/testdata/** -text
